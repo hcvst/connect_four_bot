@@ -6,4 +6,5 @@ cabal-version:     >= 1.2
 executable connect4telewrap
   main-is:         Main.hs
   hs-source-dirs:  src
-  build-depends:   base, containers, text, telewrap, telegram-api
+  build-depends:   base, containers, text, telewrap, telegram-api,
+                   aeson, aeson-pretty, bytestring, mtl

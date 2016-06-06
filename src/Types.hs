@@ -4,6 +4,7 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 
 import Connect4Game
+import I18N
 
 data Player = Player {
       playerId :: Int
@@ -18,3 +19,5 @@ data Game = Game {
 } deriving (Eq, Show)
 
 type GamesMap = Map.Map T.Text Game
+
+type LanguagePrefMap = Map.Map T.Text Lang
