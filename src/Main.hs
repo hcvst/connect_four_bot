@@ -75,7 +75,8 @@ onInlineQuery iq = do
     return ()
 
 onCallbackQuery :: CallbackQuery -> Bot GameState ()
-onCallbackQuery cq = undefined
+onCallbackQuery cq = do
+    liftIO $ putStrLn.show $ cq
 
 saveCurrentUserIdToState :: Message -> Bot GameState ()
 saveCurrentUserIdToState message = do
@@ -105,6 +106,6 @@ fromJson = decode.encodeUtf8.fromStrict
 r :: InterfaceText -> Bot GameState T.Text
 r text = do
     GameState {currentUserId = userId, languagePrefMap = pref} <- getState
-    let lang = Map.findWithDefault DE userId pref
+    let lang = Map.findWithDefault EN userId pref
     return $ render lang text
 
