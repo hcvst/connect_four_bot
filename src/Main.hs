@@ -20,19 +20,16 @@ import I18N
 import Types
 
 data GameState = GameState {
-      gamesMap :: GamesMap
-    , currentUserId :: T.Text
-    , languagePrefMap :: LanguagePrefMap}
+      gs_gamesMap :: GamesMap
+    , gs_currentUserId :: T.Text
+    , gs_languagePrefMap :: LanguagePrefMap}
 
 main :: IO ((), BotState GameState)
 main = runBot =<< newBot token handlers newGameState
   where
     token = "131224483:AAHizcRXIIQzb2sXOwbhGw-nYUuD_BPN7sQ"
     newGameState = GameState Map.empty "" Map.empty
-    handlers = MessageHandlers (Just onMessage)
-                               (Just onInlineQuery)
-                               (Just onCallbackQuery)
-                               Nothing
+    handlers = MessageHandlers (Just onMessage) (Just onInlineQuery) (Just onCallbackQuery) Nothing
 
 onMessage :: Message -> Bot GameState ()
 onMessage message = do
@@ -76,12 +73,36 @@ onInlineQuery iq = do
 
 onCallbackQuery :: CallbackQuery -> Bot GameState ()
 onCallbackQuery cq = do
+    case fromJson =<< cq_data cq of
+        Just ir@(InviteResponse{}) -> handleInviteResponse ir cq
+        Just br@(ButtonResponse{}) -> handleButtonResponse br cq
+        Nothing -> return ()
     liftIO $ putStrLn.show $ cq
+
+handleInviteResponse :: ButtonEvent -> CallbackQuery -> Bot GameState ()
+handleInviteResponse InviteResponse{ir_gameId=gameId, ir_accepted=False} cq = do
+    state@GameState{gs_gamesMap = gamesMap} <- getState
+    case Map.lookup gameId gamesMap of
+       Just game -> do
+           bot sendMessage $ sendMessageRequest (T.pack.show.playerId.player1 $ game) "Declined"
+           return ()
+       Nothing -> return ()
+
+handleInviteResponse InviteResponse{ir_gameId=gameId, ir_accepted=True} cq = do
+     state@GameState{gs_gamesMap = gamesMap} <- getState
+     case Map.lookup gameId gamesMap of
+        Just game -> do
+            bot sendMessage $ sendMessageRequest (T.pack.show.playerId.player1 $ game) "Accepted"
+            return ()
+        Nothing -> return ()
+
+handleButtonResponse :: ButtonEvent -> CallbackQuery -> Bot GameState ()
+handleButtonResponse ButtonResponse{br_gameId=gameId, br_button=button}= undefined
 
 saveCurrentUserIdToState :: Message -> Bot GameState ()
 saveCurrentUserIdToState message = do
     state <- getState
-    putState $ state {currentUserId = getUserIdFromMessage message}
+    putState $ state {gs_currentUserId = getUserIdFromMessage message}
 
 getUserIdFromMessage :: Message -> T.Text
 getUserIdFromMessage message =
@@ -89,13 +110,13 @@ getUserIdFromMessage message =
 
 setupNewGame :: InlineQuery -> Bot GameState T.Text
 setupNewGame iq = do
-    state@(GameState {gamesMap = oldGamesMap}) <- getState
-    let newGameId = T.pack.show.Map.size $ oldGamesMap
-    putState state{gamesMap = Map.insert newGameId newGame oldGamesMap}
-    return newGameId
+    state@(GameState {gs_gamesMap = oldGamesMap}) <- getState
+    putState state{gs_gamesMap = Map.insert (newGameId oldGamesMap) newGame oldGamesMap}
+    return $ newGameId oldGamesMap
   where
     player1 = Player (user_id.query_from $ iq) (user_first_name.query_from $ iq)
     newGame = Game newBoard player1 Nothing Nothing
+    newGameId = T.pack.show.Map.size
 
 toJson :: ToJSON a => a -> T.Text
 toJson = toStrict.decodeUtf8.encode
@@ -105,7 +126,6 @@ fromJson = decode.encodeUtf8.fromStrict
 
 r :: InterfaceText -> Bot GameState T.Text
 r text = do
-    GameState {currentUserId = userId, languagePrefMap = pref} <- getState
+    GameState {gs_currentUserId = userId, gs_languagePrefMap = pref} <- getState
     let lang = Map.findWithDefault EN userId pref
     return $ render lang text
-
