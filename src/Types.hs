@@ -1,7 +1,10 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Types where
 
+import Data.Aeson
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import GHC.Generics
 
 import Connect4Game
 import I18N
@@ -21,3 +24,10 @@ data Game = Game {
 type GamesMap = Map.Map T.Text Game
 
 type LanguagePrefMap = Map.Map T.Text Lang
+
+data ButtonEvent = InvitationResponse {gameId :: T.Text, accepted :: Bool}
+                 | GameButtonResponse {gameId :: T.Text, button :: Int }
+                 deriving (Show, Generic)
+
+instance FromJSON ButtonEvent
+instance ToJSON ButtonEvent

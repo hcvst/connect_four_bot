@@ -4,10 +4,13 @@ module Main where
 
 import Control.Applicative ((<$>))
 import Control.Monad.State
+import Data.Aeson
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.ByteString.Lazy.Char8 (unpack)
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import Data.Text.Lazy.Encoding (decodeUtf8, encodeUtf8)
+import Data.Text.Lazy (toStrict, fromStrict)
 
 import Telewrap
 import Web.Telegram.API.Bot
@@ -31,10 +34,6 @@ main = runBot =<< newBot token handlers newGameState
                                (Just onCallbackQuery)
                                Nothing
 
-onUpdate :: Update -> Bot GameState ()
-onUpdate update = do
-    liftIO $ putStrLn.unpack.encodePretty $ update
-
 onMessage :: Message -> Bot GameState ()
 onMessage message = do
     saveUserIdToState message
@@ -50,7 +49,29 @@ onMessage message = do
     return ()
 
 onInlineQuery :: InlineQuery -> Bot GameState ()
-onInlineQuery iq = undefined
+onInlineQuery iq = do
+    gameId <- setupNewGame iq
+    inlineText <- r SendInvitation
+    invitationText <- r Invitation
+    let inviationMsg = InputTextMessageContent invitationText Nothing Nothing
+    yesButton <- inlineKeyboardButton <$> r Yes
+    noButton <- inlineKeyboardButton <$> r No
+    rulesButton <- inlineKeyboardButton <$> r Rules
+    let inlineKeyboard = Just $ InlineKeyboardMarkup [
+            [
+                yesButton   { ikb_callback_data = Just $ toJson $ InvitationResponse gameId True}
+              , noButton    { ikb_callback_data = Just $ toJson $ InvitationResponse gameId False}
+              , rulesButton { ikb_url = Just "http://telegram.me/hcvst" }
+            ]
+          ]
+    let inlineResult = (inlineQueryResultArticle gameId inlineText inviationMsg) {
+                           iq_res_reply_markup = inlineKeyboard
+                       }
+    let response = (answerInlineQueryRequest (query_id iq) [inlineResult]) {
+                     query_cache_time = Just 0
+        }
+    bot answerInlineQuery response
+    return ()
 
 onCallbackQuery :: CallbackQuery -> Bot GameState ()
 onCallbackQuery cq = undefined
@@ -64,8 +85,26 @@ getUserIdFromMessage :: Message -> T.Text
 getUserIdFromMessage message =
     maybe "" (T.pack.show.user_id) $ from message
 
+setupNewGame :: InlineQuery -> Bot GameState T.Text
+setupNewGame iq = do
+    state@(GameState {gamesMap = oldGamesMap}) <- getState
+    let newGamesMap = Map.insert newGameId newGame oldGamesMap
+    putState state{gamesMap = newGamesMap}
+    return newGameId
+  where
+    player1 = Player (user_id.query_from $ iq) (user_first_name.query_from $ iq)
+    newGame = Game newBoard player1 Nothing Nothing
+    newGameId = query_id iq
+
+toJson :: ToJSON a => a -> T.Text
+toJson = toStrict.decodeUtf8.encode
+
+fromJson :: FromJSON a => T.Text -> Maybe a
+fromJson = decode.encodeUtf8.fromStrict
+
 r :: InterfaceText -> Bot GameState T.Text
 r text = do
     GameState {currentUserId = userId, languagePrefMap = pref} <- getState
     let lang = Map.findWithDefault DE userId pref
     return $ render lang text
+
