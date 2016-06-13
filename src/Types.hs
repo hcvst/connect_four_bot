@@ -25,8 +25,8 @@ type GamesMap = Map.Map T.Text Game
 
 type LanguagePrefMap = Map.Map T.Text Lang
 
-data ButtonEvent = InvitationResponse {gameId :: T.Text, accepted :: Bool}
-                 | GameButtonResponse {gameId :: T.Text, button :: Int }
+data ButtonEvent = InviteResponse {gameId :: T.Text, accepted :: Bool}
+                 | ButtonResponse {gameId :: T.Text, button :: Int }
                  deriving (Show, Generic)
 
 instance FromJSON ButtonEvent

@@ -36,7 +36,7 @@ main = runBot =<< newBot token handlers newGameState
 
 onMessage :: Message -> Bot GameState ()
 onMessage message = do
-    saveUserIdToState message
+    saveCurrentUserIdToState message
     response <- sendMessageRequest (getChatIdFromMessage message) <$> r Start
     keyboardLabel <- r Invite
     let keyboard = Just $ inlineKeyboardMarkup [
@@ -59,9 +59,9 @@ onInlineQuery iq = do
     rulesButton <- inlineKeyboardButton <$> r Rules
     let inlineKeyboard = Just $ InlineKeyboardMarkup [
             [
-                yesButton   { ikb_callback_data = Just $ toJson $ InvitationResponse gameId True}
-              , noButton    { ikb_callback_data = Just $ toJson $ InvitationResponse gameId False}
-              , rulesButton { ikb_url = Just "http://telegram.me/hcvst" }
+                yesButton   { ikb_callback_data = Just $ toJson $ InviteResponse gameId True}
+              , noButton    { ikb_callback_data = Just $ toJson $ InviteResponse gameId False}
+              , rulesButton { ikb_url = Just "http://telegram.me/connect_four_bot" }
             ]
           ]
     let inlineResult = (inlineQueryResultArticle gameId inlineText inviationMsg) {
@@ -71,13 +71,14 @@ onInlineQuery iq = do
                      query_cache_time = Just 0
         }
     bot answerInlineQuery response
+    liftIO $ putStrLn $ show response
     return ()
 
 onCallbackQuery :: CallbackQuery -> Bot GameState ()
 onCallbackQuery cq = undefined
 
-saveUserIdToState :: Message -> Bot GameState ()
-saveUserIdToState message = do
+saveCurrentUserIdToState :: Message -> Bot GameState ()
+saveCurrentUserIdToState message = do
     state <- getState
     putState $ state {currentUserId = getUserIdFromMessage message}
 
@@ -88,13 +89,12 @@ getUserIdFromMessage message =
 setupNewGame :: InlineQuery -> Bot GameState T.Text
 setupNewGame iq = do
     state@(GameState {gamesMap = oldGamesMap}) <- getState
-    let newGamesMap = Map.insert newGameId newGame oldGamesMap
-    putState state{gamesMap = newGamesMap}
+    let newGameId = T.pack.show.Map.size $ oldGamesMap
+    putState state{gamesMap = Map.insert newGameId newGame oldGamesMap}
     return newGameId
   where
     player1 = Player (user_id.query_from $ iq) (user_first_name.query_from $ iq)
     newGame = Game newBoard player1 Nothing Nothing
-    newGameId = query_id iq
 
 toJson :: ToJSON a => a -> T.Text
 toJson = toStrict.decodeUtf8.encode
