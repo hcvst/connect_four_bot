@@ -1,0 +1,3 @@
+[submodule "telegram-wrapper"]
+	path = telegram-wrapper
+	url = https://github.com/hcvst/telegram-wrapper.git
